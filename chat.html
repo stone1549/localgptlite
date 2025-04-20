@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>GPT Chat – Multi Chat</title>
+  <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/styles/github-dark.min.css">
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #343541;
+      color: #fff;
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    aside {
+      width: 240px;
+      background: #202123;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      border-right: 1px solid #444;
+    }
+    aside button {
+      background: #5c5f72;
+      color: #fff;
+      border: none;
+      padding: 0.6rem;
+      font-size: 0.9rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+      transition: background 0.2s;
+    }
+    aside button:hover {
+      background: #6d708a;
+    }
+    aside .chat-title {
+      font-size: 0.9rem;
+      cursor: pointer;
+      padding: 0.3rem;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+    aside .chat-title:hover {
+      background: #444;
+    }
+    aside .chat-title.active {
+      background: #3a3b4a;
+      font-weight: bold;
+      border-left: 3px solid #7ab8f5;
+      padding-left: 0.6rem;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    header {
+      padding: 0.5rem 1rem;
+      background: #202123;
+      border-bottom: 1px solid #444;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .usage-stats {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      font-weight: bold;
+      font-size: 0.8rem;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      z-index: 5;
+      pointer-events: none;
+    }
+    .controls {
+      position: absolute;
+      top: 3rem;
+      left: 0;
+      right: 0;
+      background: #202123;
+      z-index: 10;
+      padding: 1rem;
+      display: none;
+      flex-direction: column;
+      gap: 0.5rem;
+      border-bottom: 1px solid #444;
+    }
+    .controls.show {
+      display: flex;
+    }
+    #chat {
+      flex-grow: 1;
+      padding: 1rem;
+      overflow-y: auto;
+      background: #343541;
+      position: relative;
+    }
+    .msg { margin-bottom: 1rem; line-height: 1.6; }
+    .user {
+      background: #5c5f72;
+      padding: 0.75rem;
+      border-radius: 8px;
+      display: inline-block;
+      max-width: 80%;
+      color: #fff;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    }
+    .assistant {
+      color: #fff;
+    }
+    .error {
+      color: #f88;
+      font-weight: bold;
+    }
+    footer {
+      padding: 1rem;
+      background: #40414f;
+      display: flex;
+      gap: 0.5rem;
+      border-top: 1px solid #333;
+    }
+    textarea {
+      flex: 1;
+      font-size: 1rem;
+      padding: 0.5rem;
+      border: 1px solid #555;
+      border-radius: 4px;
+      resize: none;
+      background: #202123;
+      color: #fff;
+    }
+    button, select, input {
+      font-size: 1rem;
+      padding: 0.5rem;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background: #202123;
+      color: #fff;
+    }
+    #toggleSettings {
+      background: none;
+      border: none;
+      color: #7ab8f5;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-left: 1rem;
+    }
+    pre {
+      background: #1e1e1e;
+      padding: 1rem;
+      border-radius: 8px;
+      border-width: 2rem;
+      display: block;
+      overflow-x: auto;
+      font-family: monospace;
+      font-size: 0.9rem;
+      position: relative;
+    }
+    pre code {
+      padding-top: 2rem;
+    }
+    .copy-button {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: #444;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
+  <script>
+    marked.setOptions({
+      highlight: (code, lang) => hljs.highlightAuto(code).value
+    });
+  </script>
+</head>
+<body>
+<aside>
+  <button onclick="newChat()">+ New Chat</button>
+  <div id="chatList"></div>
+</aside>
+<main>
+  <header>
+    <h2 style="margin: 0; font-size: 1.2rem;">GPT Chat</h2>
+    <button id="toggleSettings">Show Settings</button>
+  </header>
+  <div class="controls" id="settingsPanel">
+    <label for="apiKey">OpenAI API Key:</label>
+    <input id="apiKey" placeholder="sk-..." style="width: 100%; margin-bottom: 0.5rem;" />
+    <label for="modelSelect">Model:</label>
+    <select id="modelSelect" style="width: 100%;">
+      <option>Loading models...</option>
+    </select>
+  </div>
+  <div id="chat">
+    <div class="usage-stats" id="usageStats"></div>
+  </div>
+  <footer>
+    <textarea id="input" rows="2" placeholder="Type your message..."></textarea>
+    <button onclick="sendMessage(); inputEl.focus();">Send</button>
+  </footer>
+</main>
+<script>
+  const apiKeyEl = document.getElementById('apiKey');
+  const modelSelect = document.getElementById('modelSelect');
+  const inputEl = document.getElementById('input');
+  const chatDiv = document.getElementById('chat');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const toggleSettings = document.getElementById('toggleSettings');
+  const usageStats = document.getElementById('usageStats');
+  const chatListEl = document.getElementById('chatList');
+
+  const MAX_CHATS = 10;
+  let chats = JSON.parse(localStorage.getItem('multiChats') || '[]');
+  let activeChatIndex = 0;
+  if (!chats.length) chats.push([]);
+  let messages = chats[activeChatIndex];
+
+  function saveChats() {
+    chats[activeChatIndex] = messages;
+    localStorage.setItem('multiChats', JSON.stringify(chats));
+  }
+
+  function renderChatList() {
+    chatListEl.innerHTML = '';
+    chats.forEach((chat, i) => {
+      const btn = document.createElement('div');
+      btn.className = 'chat-title';
+      if (i === activeChatIndex) btn.classList.add('active');
+      btn.textContent = `Chat ${i + 1}`;
+      btn.onclick = () => {
+        activeChatIndex = i;
+        messages = chats[i];
+        renderChatList();
+        renderChat();
+      };
+      chatListEl.appendChild(btn);
+    });
+  }
+
+  function newChat() {
+    if (chats.length >= MAX_CHATS) chats.shift();
+    chats.push([]);
+    activeChatIndex = chats.length - 1;
+    messages = chats[activeChatIndex];
+    renderChatList();
+    renderChat();
+    saveChats();
+  }
+
+  function renderChat() {
+    const usageEl = document.getElementById('usageStats');
+    chatDiv.innerHTML = '';
+    messages.forEach((msg, i) => {
+      const div = document.createElement('div');
+      div.className = `msg ${msg.role}`;
+      div.innerHTML = marked.parse(msg.content);
+      if (msg.role === 'user') div.classList.add('user');
+      chatDiv.appendChild(div);
+    });
+    chatDiv.appendChild(usageEl);
+    hljs.highlightAll();
+    document.querySelectorAll('pre').forEach(pre => {
+      const btn = document.createElement('button');
+      btn.className = 'copy-button';
+      btn.textContent = 'Copy';
+      btn.onclick = () => {
+        const code = pre.querySelector('code');
+        navigator.clipboard.writeText(code.innerText);
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+      };
+      pre.appendChild(btn);
+    });
+    chatDiv.scrollTop = chatDiv.scrollHeight;
+  }
+
+  function countTokens(messages) {
+    return messages.reduce((acc, m) => acc + Math.ceil((m.role.length + m.content.length) / 4), 0);
+  }
+
+  async function fetchModels() {
+    modelSelect.innerHTML = `<option disabled selected>Loading...</option>`;
+    const apiKey = apiKeyEl.value.trim();
+    if (!apiKey) return;
+    try {
+      const res = await fetch('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${apiKey}` }
+      });
+      const data = await res.json();
+      const models = (data.data || [])
+              .map(m => m.id)
+              .filter(id => id.startsWith('gpt-'))
+              .sort();
+      modelSelect.innerHTML = '';
+      models.forEach(id => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = id;
+        modelSelect.appendChild(opt);
+      });
+      modelSelect.value = models.find(m => m.includes('4.1')) || models[models.length - 1];
+    } catch (err) {
+      modelSelect.innerHTML = `<option disabled>Error loading models</option>`;
+      console.error(err);
+    }
+  }
+
+  async function sendMessage() {
+    const apiKey = apiKeyEl.value.trim();
+    localStorage.setItem('openaiApiKey', apiKey);
+    const model = modelSelect.value;
+    const input = inputEl.value.trim();
+    if (!input || !apiKey || !model) return;
+
+    messages.push({ role: "user", content: input });
+    renderChat();
+    inputEl.value = '';
+    saveChats();
+
+    const reply = { role: 'assistant', content: '' };
+    messages.push(reply);
+    renderChat();
+    saveChats();
+
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ model, messages: messages.slice(0, -1), stream: true })
+      });
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.replace('data: ', '').trim();
+            if (data === '[DONE]') break;
+            try {
+              const delta = JSON.parse(data).choices?.[0]?.delta?.content;
+              if (delta) {
+                reply.content += delta;
+                renderChat();
+              }
+            } catch (err) {
+              console.error('[Parse error]', err);
+            }
+          }
+        }
+      }
+
+      const tokenCount = countTokens(messages);
+      const estimatedCost = model.includes('gpt-4') ? tokenCount * 0.00003 : tokenCount * 0.000002;
+      usageStats.textContent = `Tokens: ${tokenCount} | ~$${estimatedCost.toFixed(4)}`;
+
+    } catch (err) {
+      reply.content = '[ERROR] ' + err.message;
+      console.error(err);
+    }
+
+    renderChat();
+    saveChats();
+  }
+
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  const savedApiKey = localStorage.getItem('openaiApiKey') || '';
+  apiKeyEl.value = savedApiKey;
+  if (savedApiKey) settingsPanel.classList.remove('hidden');
+
+  toggleSettings.addEventListener('click', () => {
+    settingsPanel.classList.toggle('show');
+    toggleSettings.textContent = settingsPanel.classList.contains('show') ? 'Hide Settings' : 'Show Settings';
+  });
+
+  apiKeyEl.addEventListener('change', () => {
+    localStorage.setItem('openaiApiKey', apiKeyEl.value.trim());
+    fetchModels();
+  });
+
+  renderChatList();
+  renderChat();
+  if (apiKeyEl.value) fetchModels();
+</script>
+</body>
+</html>
