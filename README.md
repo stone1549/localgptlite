@@ -26,8 +26,6 @@ Most GPT UI clones are either:
 - ↩️ Press `Enter` to send, `Shift+Enter` for newline
 - ⚙️ Toggleable settings drawer for API key + model
 - 🪶 Zero dependencies (outside of two CDN scripts)
-- 🔐 Works entirely in the browser — your key stays local
-- 💻 Looks great in dark mode, works offline once cached
 
 ## 🛠 Setup
 
